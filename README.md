@@ -47,4 +47,4 @@ The application focuses on:
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/realtime-chat-app.git
+git clone https://github.com/pateladbhut3-byte/Real-Time-Chat/tree/main
