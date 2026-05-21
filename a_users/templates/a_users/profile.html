@@ -1,0 +1,16 @@
+{% extends 'layouts/page.html' %}
+
+{% block content %}
+
+<img src="{{ profile.avatar }}" class="w-36 h-36 rounded-full object-cover mb-4 mx-auto"  />
+<div class="text-center">
+    <h1>{{ profile.name }}</h1>
+    <div class="text-gray-400 mb-2 -mt-3">@{{ profile.username }}</div>
+        {% if request.user.is_authenticated and request.user != profile %}
+        <div class="mt-4">
+            <a href="{% url 'private-chat' profile.username %}" class="inline-block rounded-full bg-emerald-500 px-4 py-2 text-white hover:bg-emerald-600">Message {{ profile.username }}</a>
+        </div>
+        {% endif %}
+</div>
+
+{% endblock %}

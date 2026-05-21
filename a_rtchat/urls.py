@@ -1,0 +1,30 @@
+from django.urls import path
+from .views import (
+    chat_view, 
+    private_chat_view, 
+    start_private_chat, 
+    block_user,
+    unblock_user,
+    chat_file_upload, 
+    chat_message_react, 
+    chat_message_unsend,
+    chat_message_pin,
+    start_call,
+    get_call_info,
+    end_video_call,
+)
+
+urlpatterns = [
+    path('chat/start/', start_private_chat, name='start-private-chat'),
+    path('chat/<str:username>/block/', block_user, name='chat-block-user'),
+    path('chat/<str:username>/unblock/', unblock_user, name='chat-unblock-user'),
+    path('chat/<str:username>/', private_chat_view, name='private-chat'),
+    path('', chat_view, name='home'),
+    path('send-file/', chat_file_upload, name='chat-file-upload'),
+    path('message/<int:message_id>/react/', chat_message_react, name='chat-message-react'),
+    path('message/<int:message_id>/unsend/', chat_message_unsend, name='chat-message-unsend'),
+    path('message/<int:message_id>/pin/', chat_message_pin, name='chat-message-pin'),
+    path('call/start/', start_call, name='start-call'),
+    path('call/<int:call_id>/info/', get_call_info, name='get-call-info'),
+    path('call/<int:call_id>/end/', end_video_call, name='end-call'),
+]

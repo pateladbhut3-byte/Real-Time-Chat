@@ -1,0 +1,149 @@
+/* Chat custom styles */
+
+/* Smooth scrollbar for chat container */
+#chat_container::-webkit-scrollbar {
+	width: 10px;
+}
+#chat_container::-webkit-scrollbar-track {
+	background: transparent;
+}
+#chat_container::-webkit-scrollbar-thumb {
+	background: rgba(255,255,255,0.06);
+	border-radius: 999px;
+}
+
+.fade-in-up {
+	animation: fadeUp 240ms ease-out;
+}
+
+@keyframes fadeUp {
+	from { opacity: 0; transform: translateY(6px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tiny avatar border */
+img[alt][class*="rounded-full"] {
+	border: 2px solid rgba(255,255,255,0.06);
+}
+
+.backdrop-blur-sm {
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+}
+
+/* Make form textarea a bit taller and rounded */
+.textarea, textarea, input[type="text"], input[type="search"], input {
+	border-radius: 12px;
+}
+
+/* Reaction button hover */
+form button, button {
+	transition: transform .12s ease, background-color .12s ease;
+}
+form button:hover, button:hover { transform: translateY(-2px); }
+
+@media (min-width: 768px) {
+	.md\:text-\[18px\] {
+		font-size: 18px;
+	}
+}
+
+/* Chat Theme: modern dark with accent color */
+:root {
+	--bg: #0f1724; /* deep navy */
+	--surface: #0b1220; /* very dark */
+	--accent: #06b6d4; /* cyan */
+	--accent-2: #7c3aed; /* purple */
+	--incoming: #0f1724; /* incoming bubble dark */
+	--outgoing: linear-gradient(135deg,#10b981 0%, #34d399 100%); /* green gradient */
+	--text-muted: #94a3b8;
+	--text: #e6eef8;
+}
+
+body {
+	background: radial-gradient( circle at 10% 10%, rgba(124,58,237,0.06), transparent 10% ), var(--bg);
+	color: var(--text);
+}
+
+/* chat container background tweak */
+#chat_container {
+	background: transparent;
+}
+
+/* Bubble styles */
+.chat-bubble {
+	border-radius: 14px;
+	padding: .5rem;
+	box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+	position: relative;
+}
+
+.chat-bubble.incoming {
+	background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+	border: 1px solid rgba(255,255,255,0.03) !important;
+	color: var(--text);
+}
+.chat-bubble.outgoing {
+	background: var(--outgoing) !important;
+	color: #06201a !important;
+	border: 1px solid rgba(255,255,255,0.04) !important;
+}
+
+/* timestamps and meta */
+.chat-bubble .text-[9px], .chat-bubble .text-xs { color: var(--text-muted) !important; }
+
+/* reaction pills */
+.reaction-pill { cursor: pointer; }
+.reaction-pill:hover { transform: translateY(-3px); }
+
+/* reactors popup */
+.reactors { min-width: 140px; }
+
+/* small responsiveness */
+@media (max-width: 640px) {
+	.chat-bubble { max-width: 92% !important; }
+}
+
+/* WhatsApp-like video call styles */
+#video-call-modal {
+    backdrop-filter: blur(16px);
+}
+#video-call-modal video {
+    background: black;
+}
+#video-call-modal .bg-slate-950\/80 {
+    border: 1px solid rgba(255,255,255,0.08);
+}
+#video-call-modal button {
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+#video-call-modal button:hover {
+    transform: translateY(-1px);
+}
+#incoming-call-notification {
+    backdrop-filter: blur(18px);
+}
+
+.ring-wave {
+    position: absolute;
+    width: 6rem;
+    height: 6rem;
+    border: 2px solid rgba(52, 211, 153, 0.4);
+    border-radius: 9999px;
+    animation: ringPulse 1.8s ease-out infinite;
+}
+
+@keyframes ringPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.75;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 0.35;
+    }
+    100% {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+}

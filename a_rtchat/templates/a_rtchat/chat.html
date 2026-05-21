@@ -1,0 +1,787 @@
+{% extends "layouts/blank.html" %}
+{% load static %}
+
+{% block content %}
+
+    <div data-current-user="{{ user.username }}" class="relative overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/95 shadow-[0_30px_90px_-40px_rgba(14,165,233,0.35)]" style="background-image: radial-gradient(circle at top left, rgba(16,185,129,0.14), transparent 22%), radial-gradient(circle at bottom right, rgba(99,102,241,0.14), transparent 30%);">
+        <div x-data="videoCallState()" x-cloak class="relative z-10 flex gap-6 items-start">
+            <div class="md:block hidden md:w-80">
+                {% include 'a_rtchat/sidebar.html' %}
+            </div>
+            <!-- Mobile sidebar overlay -->
+            <div x-show="open" x-cloak class="fixed inset-0 z-50 md:hidden">
+                <div class="absolute inset-0 bg-black/50" @click="open=false"></div>
+                <div class="absolute left-0 top-0 bottom-0 w-80 p-4">
+                    {% include 'a_rtchat/sidebar.html' %}
+                </div>
+            </div>
+        <div id="chat_window" class="flex-1 h-[45rem] flex flex-col rounded-[1.75rem] border border-slate-800/80 bg-slate-950/90 shadow-2xl overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 px-4 md:px-6 py-3 md:py-5 sticky top-0 z-20 backdrop-blur-xl border-b border-slate-800/80">
+                    <div class="flex items-center gap-3">
+                    <button class="md:hidden mr-2 bg-slate-800/60 text-white px-3 py-2 rounded-lg" @click.prevent="open = true">Menu</button>
+                    {% if chatroom_name|slice:'0:8' == 'private-' %}
+                        {% with private_chats|first as first_chat %}
+                            <img src="{{ first_chat.user.avatar|default:'/static/images/avatar.svg' }}" alt="room" class="w-12 h-12 rounded-full object-cover border border-emerald-400/40 shadow-lg">
+                        {% endwith %}
+                    {% else %}
+                        <img src="/static/images/avatar.svg" alt="room" class="w-12 h-12 rounded-full object-cover border border-slate-500/40 shadow-lg">
+                    {% endif %}
+                    <div class="leading-tight">
+                        <div class="font-semibold text-white text-lg">{{ chatroom_title|default:"Chat room" }}</div>
+                        <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-400">
+                            <span>{{ chatroom_name|default:"general" }}</span>
+                            <span id="online-icon" class="inline-flex items-center mr-2 text-emerald-300">●</span>
+                            <span id="online-count" class="inline-flex items-center rounded-full border border-slate-700/80 bg-slate-800/80 px-2.5 py-1 text-emerald-300">{{ online_count|default:"0" }} online</span>
+                        </div>
+                    </div>
+                </div>
+                    <div class="flex items-center gap-3">
+                        {% if private_partner %}
+                            {% if block_status.user_has_blocked %}
+                                <form method="post" action="{% url 'chat-unblock-user' private_partner.username %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-2 rounded-lg bg-yellow-500/15 hover:bg-yellow-500/25 text-amber-200 transition-colors" title="Unblock user">
+                                        Unblock
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="{% url 'chat-block-user' private_partner.username %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-200 transition-colors" title="Block user">
+                                        Block
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if private_partner and not block_status.user_has_blocked and not block_status.other_has_blocked %}
+                            <button onclick="window.startVideoCallWithUser('{{ private_partner.username }}')" class="p-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/20 text-emerald-300 transition-colors" title="Start Video Call">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M2.25 3.25a.75.75 0 01.75-.75h4.5a.75.75 0 01.75.75v3.25a.75.75 0 01-.75.75H4.5v1.5c0 .83.67 1.5 1.5 1.5h1.5v2.25H6a.75.75 0 01-.75-.75v-1.5H4.5a2.25 2.25 0 01-2.25-2.25V3.25zm5.25 4.5V4.5H4.5v3.25h3zM17.25 3.25a.75.75 0 00-.75-.75h-4.5a.75.75 0 00-.75.75v3.25a.75.75 0 00.75.75h1.5v1.5c0 .83-.67 1.5-1.5 1.5h-1.5V13h1.5a.75.75 0 00.75-.75v-1.5h1.5a2.25 2.25 0 002.25-2.25V3.25zM8.25 15.75l-2.5 6.5 4.5-2.15 4.5 2.15-2.5-6.5h-4z"/>
+                                </svg>
+                            </button>
+                        {% endif %}
+                    </div>
+            </div>
+            {% if private_partner and block_status.other_has_blocked %}
+                <div class="px-4 py-3 bg-red-500/10 border border-red-500/10 text-sm text-red-200">
+                    You cannot send messages because {{ private_partner.username }} has blocked you.
+                </div>
+            {% elif private_partner and block_status.user_has_blocked %}
+                <div class="px-4 py-3 bg-yellow-500/10 border border-yellow-500/10 text-sm text-amber-200">
+                    You have blocked {{ private_partner.username }}. Unblock them to send messages.
+                </div>
+            {% endif %}
+            <div id='chat_container' class="overflow-y-auto grow bg-slate-950/80 p-2 md:p-2">
+                <div id='chat_messages' class="flex flex-col justify-end gap-1 p-2 md:p-2">
+                    {% for message in chat_messages reversed %}
+                         {% include "a_rtchat/chat_message.html" %}
+                     {% endfor %}
+                </div>
+            </div>
+            <div class="sticky bottom-0 z-10 p-3 md:p-5 bg-slate-900/95 border-t border-slate-800/80 backdrop-blur-xl">
+            <div id="reply_preview" class="hidden rounded-3xl border border-emerald-500/60 p-4 mb-3 text-sm text-white bg-slate-900/95 shadow-inner">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="font-semibold">Replying to</span>
+                    <button type="button" class="text-xs text-slate-300" _="on click set #reply_to.value to '' then set #reply_to_file.value to '' then add .hidden to #reply_preview">Cancel</button>
+                </div>
+                <div id="reply_preview_text" class="mt-2 text-slate-200"></div>
+            </div>
+
+                <form id="chat_message_form" class="w-full">
+                    {% csrf_token %}
+                    <input type="hidden" id="chatroom_name" name="chatroom_name" value="{{ chatroom_name }}">
+                    <input type="hidden" id="reply_to" name="reply_to">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex-1">{{ form.body }}</div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="submit" class="button !px-4 !py-2 !text-lg" {% if private_partner and block_status.user_has_blocked or private_partner and block_status.other_has_blocked %}disabled{% endif %}>Send</button>
+                            <button type="button" class="button button-gray !px-3 !py-2 !text-lg" _="on click toggle .hidden on #file_upload_panel" {% if private_partner and block_status.user_has_blocked or private_partner and block_status.other_has_blocked %}disabled{% endif %}>Attach</button>
+                        </div>
+                    </div>
+                </form>
+
+            <div id="file_upload_panel" class="hidden mt-3">
+                <form id="file_upload_form" action="{% url 'chat-file-upload' %}" method="post" enctype="multipart/form-data" hx-post="{% url 'chat-file-upload' %}" hx-target="#chat_messages" hx-swap="beforeend">
+                    {% csrf_token %}
+                    <input type="hidden" id="chatroom_name" name="chatroom_name" value="{{ chatroom_name }}">
+                    <input type="hidden" id="reply_to_file" name="reply_to">
+                    {{ form.file }}
+                    <button type="submit" class="button mt-2">Send file</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Video Call Modal -->
+        {% include 'a_rtchat/partials/video_call_modal.html' %}
+        
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascript %}
+
+<script>
+    // Make videoCallState available globally for Alpine.js
+    window.videoCallState = function() {
+        return {
+            open: false,
+            videoCallActive: false,
+            incomingCall: false,
+            currentCallId: null,
+            calleeUsername: null,
+            
+            initiateVideoCall(recipientUsername) {
+                console.log('🎬 initiateVideoCall called with:', recipientUsername);
+                if (window.videoCallManager && window.ws) {
+                    this.videoCallActive = true;
+                    this.calleeUsername = recipientUsername;
+                    // Pass Alpine state to video call manager
+                    window.videoCallManager.setAlpineState(this);
+                    window.videoCallManager.initializeCall(recipientUsername, '{{ chatroom_name }}');
+                } else {
+                    console.warn('⚠️ videoCallManager or ws not ready');
+                    alert('Connection not ready. Please try again.');
+                }
+            }
+        };
+    };
+
+    // Fallback function for video call
+    window.startVideoCallWithUser = function(recipientUsername) {
+        console.log('🎬 startVideoCallWithUser called with:', recipientUsername);
+        if (window.videoCallManager && window.ws) {
+            const chatroomElement = document.getElementById('chatroom_name');
+            const chatroom = chatroomElement ? chatroomElement.value : 'unknown';
+            console.log('📍 Chatroom:', chatroom);
+
+            const alpineElement = document.querySelector('[x-data]');
+            if (alpineElement && alpineElement.__x) {
+                const alpineData = alpineElement.__x.$data;
+                alpineData.videoCallActive = true;
+            }
+
+            window.videoCallManager.initializeCall(recipientUsername, chatroom);
+        } else {
+            console.warn('⚠️ videoCallManager or ws not ready');
+            alert('Connection not ready. Please refresh the page.');
+        }
+    };
+
+    // ===== NOTIFICATION HANDLER =====
+    window.showNotification = function(notification) {
+        const { sender_name, sender_username, message_preview, sender_avatar, chatroom_name } = notification;
+        
+        console.log('🔔 Showing notification from:', sender_name);
+        
+        // Create notification element
+        const notifDiv = document.createElement('div');
+        notifDiv.className = 'fixed top-4 right-4 z-[9999] animate-in fade-in slide-in-from-top-4 duration-300 group';
+        notifDiv.innerHTML = `
+            <div class="flex items-center gap-3 bg-gradient-to-r from-emerald-900/95 to-slate-900/95 border border-emerald-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-xl hover:border-emerald-500/60 transition-colors cursor-pointer max-w-sm">
+                <img src="${sender_avatar}" alt="${sender_name}" class="w-12 h-12 rounded-full object-cover border border-emerald-400/40">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-white text-sm">${sender_name}</div>
+                    <div class="text-xs text-slate-300 truncate">${message_preview}</div>
+                </div>
+                <button class="ml-2 text-slate-400 hover:text-white transition-colors group-hover:opacity-100">
+                    ✕
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notifDiv);
+        
+        // Close button handler
+        const closeBtn = notifDiv.querySelector('button');
+        closeBtn.addEventListener('click', () => {
+            notifDiv.remove();
+        });
+        
+        // Click to navigate to chat
+        notifDiv.addEventListener('click', (e) => {
+            if (e.target !== closeBtn) {
+                let targetUrl = '/chat/' + chatroom_name;
+                if (chatroom_name && chatroom_name.startsWith('private-') && sender_username) {
+                    targetUrl = '/chat/' + sender_username;
+                }
+                window.location.href = targetUrl;
+            }
+        });
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notifDiv.parentNode) {
+                notifDiv.remove();
+            }
+        }, 5000);
+        
+        // Play notification sound
+        playNotificationSound();
+    };
+
+    // ===== NOTIFICATION SOUND =====
+    window.playNotificationSound = function() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+
+            const playSound = () => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 880;
+                gainNode.gain.value = 0.3;
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.start();
+                gainNode.gain.setTargetAtTime(0, audioContext.currentTime + 0.1, 0.05);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            };
+
+            playSound();
+            setTimeout(playSound, 150);
+        } catch (err) {
+            console.log('Could not play notification sound:', err);
+        }
+    };
+
+    // ===== WEBSOCKET MESSAGE HANDLER =====
+    // Processes incoming WebSocket payloads (JSON or HTML with HTMX OOB swaps)
+    window.handleWebSocketMessage = function(data) {
+        // Try JSON first
+        try {
+            const parsed = JSON.parse(data);
+            console.log('📦 Received JSON over WS:', parsed);
+            
+            // Handle notification events
+            if (parsed.type === 'notification') {
+                showNotification(parsed);
+                return;
+            }
+            
+            // Handle video call events
+            if (parsed.type === 'call_initiation') {
+                handleIncomingCall(parsed);
+            } else if (parsed.type === 'call_answer') {
+                window.videoCallManager.handleCallAnswer(parsed);
+            } else if (parsed.type === 'call_decline') {
+                handleCallDecline(parsed);
+            } else if (parsed.type === 'ice_candidate') {
+                window.videoCallManager.handleIceCandidate(parsed);
+            } else if (parsed.type === 'call_end') {
+                handleCallEnd(parsed);
+            }
+            return;
+        } catch (e) {
+            // Not JSON — treat as HTML payload
+        }
+
+        try {
+            const container = document.createElement('div');
+            container.innerHTML = data;
+
+            // Handle HTMX out-of-band swaps (elements with hx-swap-oob)
+            const oob = container.querySelectorAll('[hx-swap-oob]');
+            if (oob.length) {
+                oob.forEach(node => {
+                    const swap = node.getAttribute('hx-swap-oob') || '';
+                    const targetSel = node.getAttribute('hx-target');
+                    const inner = node.innerHTML;
+
+                    if (targetSel && targetSel.startsWith('#')) {
+                        const target = document.querySelector(targetSel);
+                        if (target) {
+                            if (swap.includes('beforeend')) {
+                                target.insertAdjacentHTML('beforeend', inner);
+                            } else if (swap.includes('afterbegin')) {
+                                target.insertAdjacentHTML('afterbegin', inner);
+                            } else if (swap.includes('outerHTML')) {
+                                target.outerHTML = inner;
+                            } else if (swap.includes('delete')) {
+                                const el = document.querySelector(targetSel);
+                                if (el) el.remove();
+                            } else {
+                                target.insertAdjacentHTML('beforeend', inner);
+                            }
+                            try { if (window.htmx) window.htmx.process(target); } catch (err) { /* ignore */ }
+                        }
+                    } else {
+                        // No target — append to body
+                        document.body.insertAdjacentHTML('beforeend', inner);
+                        try { if (window.htmx) window.htmx.process(document.body); } catch (err) { /* ignore */ }
+                    }
+                });
+            } else {
+                // Fallback: append raw HTML to messages container
+                const messages = document.getElementById('chat_messages');
+                if (messages) {
+                    messages.insertAdjacentHTML('beforeend', data);
+                    try { if (window.htmx) window.htmx.process(messages); } catch (err) { /* ignore */ }
+                }
+            }
+
+            // Keep view scrolled to bottom
+            try { scrollToBottom(); } catch (err) { /* ignore */ }
+        } catch (err) {
+            console.error('✗ Error handling WS message:', err);
+        }
+    };
+
+    // Video Call Event Handlers
+    function playIncomingRingtone() {
+        if (!window.incomingRingtone) {
+            window.incomingRingtone = {
+                ctx: null,
+                interval: null
+            };
+        }
+
+        const ctx = window.incomingRingtone.ctx || new (window.AudioContext || window.webkitAudioContext)();
+        window.incomingRingtone.ctx = ctx;
+
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+
+        if (window.incomingRingtone.interval) {
+            return;
+        }
+
+        const playTone = () => {
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            oscillator.type = 'triangle';
+            oscillator.frequency.value = 640;
+            gainNode.gain.value = 0;
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            oscillator.start();
+            gainNode.gain.setTargetAtTime(0.12, ctx.currentTime, 0.02);
+            gainNode.gain.setTargetAtTime(0, ctx.currentTime + 0.18, 0.02);
+            oscillator.stop(ctx.currentTime + 0.2);
+        };
+
+        playTone();
+        window.incomingRingtone.interval = setInterval(playTone, 900);
+    }
+
+    function stopIncomingRingtone() {
+        if (window.incomingRingtone && window.incomingRingtone.interval) {
+            clearInterval(window.incomingRingtone.interval);
+            window.incomingRingtone.interval = null;
+        }
+    }
+
+    function handleIncomingCall(data) {
+        // Get Alpine element
+        const alpineElement = document.querySelector('[x-data]');
+        let alpineData = null;
+        
+        if (alpineElement && alpineElement.__x) {
+            alpineData = alpineElement.__x.$data;
+            alpineData.incomingCall = true;
+            alpineData.currentCallId = data.call_id;
+        }
+        
+        // Set caller info
+        const callerNameEl = document.getElementById('caller-name');
+        const callerAvatarEl = document.getElementById('caller-avatar');
+        if (callerNameEl) callerNameEl.textContent = data.caller_username + ' is calling...';
+        if (callerAvatarEl) callerAvatarEl.src = '/static/images/avatar.svg';
+        
+        console.log('📞 Incoming call from:', data.caller_username);
+        
+        // Store offer for when user accepts
+        window.pendingOffer = data;
+        playIncomingRingtone();
+    }
+
+    function handleCallDecline(data) {
+        stopIncomingRingtone();
+        if (window.videoCallManager) {
+            window.videoCallManager.closeCall();
+        }
+        alert('Call declined');
+    }
+
+    function handleCallEnd(data) {
+        stopIncomingRingtone();
+        if (window.videoCallManager) {
+            window.videoCallManager.closeCall();
+        }
+    }
+
+    // Show secure origin warning for video calls when needed
+    function showSecureOriginWarning() {
+        const host = location.hostname;
+        const protocol = location.protocol;
+        if (protocol !== 'https:' && host !== 'localhost' && host !== '127.0.0.1') {
+            const warning = document.getElementById('secure-context-warning');
+            const localLink = document.getElementById('secure-context-localhost');
+            if (warning && localLink) {
+                const port = location.port || '8000';
+                localLink.href = `http://localhost:${port}${location.pathname}${location.search}`;
+                warning.classList.remove('hidden');
+            }
+        }
+    }
+
+    // Initialize event listeners for video call modal
+    function initializeVideoCallListeners() {
+        const acceptBtn = document.getElementById('accept-call-btn');
+        const declineBtn = document.getElementById('decline-call-btn');
+        const endCallBtn = document.getElementById('end-call-btn');
+        const toggleMicBtn = document.getElementById('toggle-mic');
+        const toggleCameraBtn = document.getElementById('toggle-camera');
+        const toggleScreenBtn = document.getElementById('toggle-screen');
+
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', () => {
+                stopIncomingRingtone();
+                if (window.pendingOffer && window.videoCallManager) {
+                    const alpineElement = document.querySelector('[x-data]');
+                    if (alpineElement && alpineElement.__x) {
+                        const alpineData = alpineElement.__x.$data;
+                        alpineData.incomingCall = false;
+                        alpineData.videoCallActive = true;
+                    }
+                    window.videoCallManager.handleIncomingCall(window.pendingOffer);
+                }
+            });
+        }
+
+        if (declineBtn) {
+            declineBtn.addEventListener('click', () => {
+                stopIncomingRingtone();
+                if (window.videoCallManager) {
+                    window.videoCallManager.declineCall();
+                    const alpineElement = document.querySelector('[x-data]');
+                    if (alpineElement && alpineElement.__x) {
+                        const alpineData = alpineElement.__x.$data;
+                        alpineData.incomingCall = false;
+                    }
+                }
+            });
+        }
+
+        if (endCallBtn) {
+            endCallBtn.addEventListener('click', () => {
+                if (window.videoCallManager) {
+                    window.videoCallManager.endCall();
+                }
+            });
+        }
+
+        if (toggleMicBtn) {
+            toggleMicBtn.addEventListener('click', () => {
+                if (window.videoCallManager) {
+                    window.videoCallManager.toggleMicrophone();
+                }
+            });
+        }
+
+        if (toggleCameraBtn) {
+            toggleCameraBtn.addEventListener('click', () => {
+                if (window.videoCallManager) {
+                    window.videoCallManager.toggleCamera();
+                }
+            });
+        }
+
+        if (toggleScreenBtn) {
+            toggleScreenBtn.addEventListener('click', () => {
+                if (window.videoCallManager) {
+                    window.videoCallManager.toggleScreenShare();
+                }
+            });
+        }
+    }
+
+    // Call this when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeVideoCallListeners();
+        showSecureOriginWarning();
+    });
+    setTimeout(function() {
+        initializeVideoCallListeners();
+        showSecureOriginWarning();
+    }, 100);
+
+    // ===== MANUAL WEBSOCKET MANAGEMENT =====
+    let ws = null;
+    let wsReconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    
+    function createWebSocketConnection() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log('✓ WebSocket already connected');
+            return;
+        }
+        
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/ws/chatroom/{{ chatroom_name }}';
+        
+        console.log('🔗 Connecting to WebSocket:', wsUrl);
+        
+        try {
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                console.log('✓ WebSocket connected');
+                wsReconnectAttempts = 0;
+                wsSocket = ws;
+                wsReady = true;
+                window.ws = ws;  // Make globally accessible for video calls
+            };
+            
+            ws.onmessage = function(event) {
+                console.log('📩 WebSocket message received:', event.data.substring(0, 100));
+                window.handleWebSocketMessage(event.data);
+            };
+            
+            ws.onerror = function(event) {
+                console.error('✗ WebSocket error:', event);
+            };
+            
+            ws.onclose = function(event) {
+                console.log('⚠️ WebSocket closed, code:', event.code);
+                wsReady = false;
+                wsSocket = null;
+                
+                // Attempt to reconnect
+                if (wsReconnectAttempts < maxReconnectAttempts) {
+                    wsReconnectAttempts++;
+                    console.log('🔄 Attempting to reconnect... (attempt', wsReconnectAttempts + '/' + maxReconnectAttempts + ')');
+                    setTimeout(createWebSocketConnection, 2000 * wsReconnectAttempts);
+                }
+            };
+        } catch (err) {
+            console.error('✗ Error creating WebSocket:', err);
+        }
+    }
+    
+    // Initialize WebSocket connection
+    console.log('🚀 Initializing WebSocket connection');
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', createWebSocketConnection);
+    } else {
+        createWebSocketConnection();
+    }
+    
+    // Also try to connect on page visibility change
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            console.log('📍 Page became visible, reconnecting WebSocket');
+            createWebSocketConnection();
+        }
+    });
+
+    // ===== WEBSOCKET CONNECTION TRACKING (Legacy, for voice calls) =====
+    let wsSocket = null;
+    let wsReady = false;
+
+    // Wait for WebSocket to be ready
+    function getWebSocket() {
+        return new Promise((resolve) => {
+            if (wsReady && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
+                console.log('✓ Using WebSocket (manual)');
+                resolve(wsSocket);
+                return;
+            }
+            
+            // Try multiple times to get the socket
+            let attempts = 0;
+            const checkSocket = setInterval(() => {
+                // Try HTMX first
+                const wsDiv = document.querySelector('[hx-ext="ws"]');
+                if (wsDiv && wsDiv.htmx && wsDiv.htmx.socket) {
+                    const socket = wsDiv.htmx.socket;
+                    if (socket.readyState === WebSocket.OPEN) {
+                        wsSocket = socket;
+                        wsReady = true;
+                        console.log('✓ WebSocket found (HTMX)');
+                        clearInterval(checkSocket);
+                        resolve(socket);
+                        return;
+                    }
+                }
+                
+                // Fallback to manual ws
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    wsSocket = ws;
+                    wsReady = true;
+                    console.log('✓ WebSocket found (manual)');
+                    clearInterval(checkSocket);
+                    resolve(ws);
+                    return;
+                }
+                
+                attempts++;
+                if (attempts > 100) { // Wait max 10 seconds
+                    console.warn('✗ WebSocket not ready after timeout');
+                    clearInterval(checkSocket);
+                    resolve(null);
+                }
+            }, 100);
+        });
+    }
+
+    // ===== CHAT MESSAGE FORM SUBMISSION =====
+    let formInitialized = false;
+    
+    function initializeChatForm() {
+        if (formInitialized) {
+            console.log('✓ Form already initialized');
+            return;
+        }
+        
+        const chatForm = document.getElementById('chat_message_form');
+        const bodyInput = document.getElementById('id_body');
+        
+        if (!chatForm) {
+            console.log('⏳ Chat form not found, retrying...');
+            setTimeout(initializeChatForm, 100);
+            return;
+        }
+        
+        if (!bodyInput) {
+            console.log('⏳ Body input not found, retrying...');
+            setTimeout(initializeChatForm, 100);
+            return;
+        }
+        
+        console.log('✓ Initializing chat form with all elements present');
+        formInitialized = true;
+        
+        chatForm.addEventListener('submit', async function(evt) {
+            evt.preventDefault();
+            console.log('📤 Form submitted');
+            
+            // Get the message body
+            const messageBody = bodyInput.value.trim();
+            const replyToInput = document.getElementById('reply_to');
+            const replyTo = replyToInput ? replyToInput.value || null : null;
+            
+            console.log('📝 Message body:', messageBody, 'Reply to:', replyTo);
+            
+            if (!messageBody) {
+                console.log('⚠️ Empty message, ignoring');
+                return;
+            }
+            
+            // Get the WebSocket
+            const socket = await getWebSocket();
+            if (!socket) {
+                console.error('✗ WebSocket not available');
+                alert('Connection lost. Please refresh the page.');
+                return;
+            }
+            
+            if (socket.readyState !== WebSocket.OPEN) {
+                console.error('✗ WebSocket not open, state:', socket.readyState);
+                alert('Connection not ready. Please try again.');
+                return;
+            }
+            
+            // Send the message as JSON
+            const payload = JSON.stringify({
+                body: messageBody,
+                reply_to: replyTo
+            });
+            
+            console.log('📨 Sending message:', payload);
+            try {
+                socket.send(payload);
+                console.log('✓ Message sent successfully');
+            } catch (err) {
+                console.error('✗ Error sending message:', err);
+                alert('Failed to send message');
+                return;
+            }
+            
+            // Clear form fields after submission
+            bodyInput.value = '';
+            if (replyToInput) {
+                replyToInput.value = '';
+            }
+            var replyFileInput = document.getElementById('reply_to_file');
+            if (replyFileInput) {
+                replyFileInput.value = '';
+            }
+            var replyPreview = document.getElementById('reply_preview');
+            if (replyPreview) {
+                replyPreview.classList.add('hidden');
+            }
+            scrollToBottom();
+        });
+    }
+    
+    // Initialize form - use multiple strategies to ensure it runs
+    console.log('🚀 Starting chat form initialization');
+    
+    // Strategy 1: If DOM is already loaded
+    if (document.readyState === 'loading') {
+        console.log('📍 DOM still loading, waiting for DOMContentLoaded');
+        document.addEventListener('DOMContentLoaded', initializeChatForm);
+    } else {
+        console.log('📍 DOM already loaded, initializing form now');
+        initializeChatForm();
+    }
+    
+    // Strategy 2: Also initialize on htmx:load (when HTMX loads content)
+    document.addEventListener('htmx:load', function(evt) {
+        console.log('📍 HTMX load event triggered');
+        formInitialized = false;  // Reset flag
+        initializeChatForm();
+    });
+    
+    // Strategy 3: Initialize after a short delay as backup
+    setTimeout(() => {
+        if (!formInitialized) {
+            console.log('📍 Timeout triggered initialization');
+            initializeChatForm();
+        }
+    }, 500);
+
+    // ===== EXISTING SCROLL & FORM LOGIC =====
+    function scrollToBottom() {
+        const container = document.getElementById('chat_container');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+            const lastMessage = container.querySelector('#chat_messages > *:last-child');
+            if (lastMessage) {
+                lastMessage.scrollIntoView({ block: 'end', behavior: 'auto' });
+            }
+        }
+    }
+    
+    // ===== SCROLL LOGIC =====
+    
+    // Initial scroll
+    document.addEventListener('DOMContentLoaded', scrollToBottom);
+    window.addEventListener('load', scrollToBottom);
+    setTimeout(scrollToBottom, 250);
+    
+    // Scroll on HTMX events
+    document.body.addEventListener('htmx:afterOnLoad', function () {
+        scrollToBottom();
+    });
+    
+    document.body.addEventListener('htmx:afterSwap', function () {
+        scrollToBottom();
+    });
+    
+    document.body.addEventListener('htmx:afterSettle', function () {
+        scrollToBottom();
+    });
+
+</script>
+
+<!-- Include Video Call JavaScript -->
+<script src="{% static 'js/video-call.js' %}"></script>
+
+{% endblock %}

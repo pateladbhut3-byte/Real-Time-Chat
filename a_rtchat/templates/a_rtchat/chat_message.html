@@ -1,0 +1,160 @@
+{% load rtchat_extras %}
+<div id="message-{{ message.id }}">
+{% if message.author == user %}
+<div class="flex justify-end mb-2">
+    <div class="mr-1 flex items-end">
+        <div class="chat-bubble outgoing bg-gradient-to-br from-emerald-300 via-emerald-200 to-white rounded-l-2xl rounded-tr-2xl p-1 sm:p-2 max-w-[85%] sm:max-w-[78%] md:max-w-[60%] shadow-md border border-emerald-100/40 transition duration-200 hover:-translate-y-0.5 text-xs">
+            {% if message.reply_to %}
+            <div class="mb-1 rounded-xl bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                Reply to {{ message.reply_to.author.name }}:
+                {% if message.reply_to.body %}
+                    {{ message.reply_to.body|truncatechars:40 }}
+                {% elif message.reply_to.file %}
+                    {{ message.reply_to.file.name|truncatechars:40 }}
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if message.pinned %}
+            <div class="mb-1 text-[10px] text-amber-300">📌 Pinned{% if message.pinned_by %} by {{ message.pinned_by.get_full_name|default:message.pinned_by.username }}{% endif %}</div>
+            {% endif %}
+            <div class="whitespace-pre-wrap text-base md:text-lg text-slate-900">{{ message.body }}</div>
+            {% if message.file %}
+            <div class="mt-1 text-xs">
+                <a href="{{ message.file.url }}" class="text-slate-800 underline decoration-emerald-500">Download {{ message.file.name|truncatechars:30 }}</a>
+            </div>
+            {% endif %}
+            <div class="mt-1 flex flex-wrap gap-1 text-[10px] md:text-[9px] text-slate-700 items-center">
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="❤️">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">❤️ {{ message.heart_reaction_count }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="👍">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">👍 {{ message.thumbs_reaction_count }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😂">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">😂 {{ message.reaction_counts|get_item:"😂"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😮">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">😮 {{ message.reaction_counts|get_item:"😮"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😢">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">😢 {{ message.reaction_counts|get_item:"😢"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="🔥">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">🔥 {{ message.reaction_counts|get_item:"🔥"|default:0 }}</button>
+                </form>
+                <button type="button" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition" data-reply-id="{{ message.id }}" data-reply-summary="{{ message.author.name }}: {% if message.body %}{{ message.body|truncatechars:30|escapejs }}{% elif message.file %}{{ message.file.name|truncatechars:30|escapejs }}{% else %}message{% endif %}" _="on click set #reply_to.value to my.dataset.replyId then set #reply_to_file.value to my.dataset.replyId then set #reply_preview_text.textContent to my.dataset.replySummary remove .hidden from #reply_preview">Reply</button>
+                <form hx-post="{% url 'chat-message-unsend' message.id %}" hx-target="#message-{{ message.id }}" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">Unsend</button>
+                </form>
+                <form hx-post="{% url 'chat-message-pin' message.id %}" hx-target="#message-{{ message.id }}" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-1.5 py-0.5 text-[11px] sm:text-[10px] text-white hover:bg-slate-800 transition">{% if message.pinned %}Unpin{% else %}📌 Pin{% endif %}</button>
+                </form>
+                
+            </div>
+            <div id="message-{{ message.id }}-reactions">
+                {% include 'a_rtchat/partials/reaction_summary.html' with message=message %}
+            </div>
+            <div class="text-[9px] md:text-[8px] text-slate-500 mt-1 text-right">{{ message.created|date:"M d, H:i" }}</div>
+        </div>
+        <div class="flex items-end ml-1">
+            <a href="{% url 'profile' message.author.username %}">
+                <img class="w-6 h-6 sm:w-5 sm:h-5 rounded-full object-cover" src="{{ message.author.avatar|default:'/static/images/avatar.svg' }}" alt="{{ message.author.username }} avatar">
+            </a>
+        </div>
+    </div>
+</div>
+ 
+{% else %}
+<div class="mb-2">
+    <div class="flex justify-start">
+        <div class="flex items-end mr-1">
+            <a href="{% url 'profile' message.author.username %}">
+                <img class="w-6 h-6 sm:w-5 sm:h-5 rounded-full object-cover" src="{{ message.author.avatar|default:'/static/images/avatar.svg' }}" alt="{{ message.author.username }} avatar">
+            </a>
+        </div>
+        <div class="chat-bubble incoming bg-slate-900/95 border border-slate-800 rounded-r-2xl rounded-tl-2xl p-1 sm:p-2 max-w-[85%] sm:max-w-[78%] md:max-w-[60%] shadow-md transition duration-200 hover:-translate-y-0.5 text-xs">
+            {% if message.reply_to %}
+            <div class="mb-1 rounded-xl bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                Reply to {{ message.reply_to.author.name }}:
+                {% if message.reply_to.body %}
+                    {{ message.reply_to.body|truncatechars:40 }}
+                {% elif message.reply_to.file %}
+                    {{ message.reply_to.file.name|truncatechars:40 }}
+                {% endif %}
+            </div>
+            {% endif %}
+            <div class="whitespace-pre-wrap text-base md:text-lg text-slate-100">{{ message.body }}</div>
+            {% if message.file %}
+            <div class="mt-1 text-xs">
+                <a href="{{ message.file.url }}" class="text-emerald-300 underline decoration-slate-500">Download {{ message.file.name|truncatechars:30 }}</a>
+            </div>
+            {% endif %}
+            <div class="mt-1 flex flex-wrap gap-1 text-[10px] md:text-[9px] text-slate-300">
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="❤️">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">❤️ {{ message.heart_reaction_count }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="👍">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">👍 {{ message.thumbs_reaction_count }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😂">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">😂 {{ message.reaction_counts|get_item:"😂"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😮">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">😮 {{ message.reaction_counts|get_item:"😮"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="😢">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">😢 {{ message.reaction_counts|get_item:"😢"|default:0 }}</button>
+                </form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="emoji" value="🔥">
+                    <button type="submit" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition">🔥 {{ message.reaction_counts|get_item:"🔥"|default:0 }}</button>
+                </form>
+                <button type="button" class="rounded-full bg-slate-900/90 px-2 py-0.5 text-white hover:bg-slate-800 transition" data-reply-id="{{ message.id }}" data-reply-summary="{{ message.author.name }}: {% if message.body %}{{ message.body|truncatechars:30|escapejs }}{% elif message.file %}{{ message.file.name|truncatechars:30|escapejs }}{% else %}message{% endif %}" _="on click set #reply_to.value to my.dataset.replyId then set #reply_to_file.value to my.dataset.replyId then set #reply_preview_text.textContent to my.dataset.replySummary remove .hidden from #reply_preview">Reply</button>
+            </div>
+            <!-- emoji picker toggled on message click -->
+            <div class="emoji-picker hidden" aria-hidden="true">
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="❤️"><button type="submit">❤️</button></form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="👍"><button type="submit">👍</button></form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="😂"><button type="submit">😂</button></form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="😮"><button type="submit">😮</button></form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="😢"><button type="submit">😢</button></form>
+                <form hx-post="{% url 'chat-message-react' message.id %}" hx-target="#message-{{ message.id }}-reactions" hx-swap="outerHTML" class="inline">{% csrf_token %}<input type="hidden" name="emoji" value="🔥"><button type="submit">🔥</button></form>
+            </div>
+            <div id="message-{{ message.id }}-reactions">
+                {% include 'a_rtchat/partials/reaction_summary.html' with message=message %}
+            </div>
+            <div class="text-[9px] md:text-[8px] text-slate-500 mt-1">{{ message.created|date:"M d, H:i" }}</div>
+        </div>
+    </div>
+    <div class="text-xs font-light py-0.5 ml-8">
+        <span class="text-slate-200">{{ message.author.name }}</span>
+        <span class="text-slate-500">@{{ message.author.username }}</span>
+    </div>
+</div>
+{% endif %}
+</div>
